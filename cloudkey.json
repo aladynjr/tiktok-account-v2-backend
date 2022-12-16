@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "tiktok-profiles",
+  "private_key_id": "20a0aa28870a0e231b47ec125c53bfc0a78d8b79",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCoPz65oavtmw6N\nUfBUo74cfyTBgEnhgiDsb4dLHrDZ6dK7BfdPv1yL3E852LLiCAI5VsxNEvAxVRvZ\nj0Uv4YGL96mag4NNpPR8kGB49lysvzZP+WB1HAGQNDklzPIk31znGgdEMfulAI9w\nMCzL+pgm5hiAmgjJJMWckqiOSpUj1aQkBKrRb8Xq8zzSaOq0WPiPwNUJpmKbkPYD\nYmjp22kAppLD4rYIJBbxR9Bi8zpv94vfn4AW6DU/k0SCmMuWKidH6f0muK88bZn7\nopiK+2dyGMxY8wpiw+dz0cdK7Rl/7/cdiSMNK5l8LjYBtvMtYEF/RcnP9BX88owc\nb9AKgYCdAgMBAAECggEAEQ72iGI6uRjVUSFLbX17n06J1r+v3fgwZ+CH9mcadcG2\nHsXEVTbZBoo0EzCkNHQs64zgInlm1o2jSPv0fx4NYThfXx3x8Gum6UFHMsSB0XcC\npfmqHL2V7/3HhIxiybfG5tyV+4VY1xo3MOAFjrnt9tWyCsnzVZePnKgnBGRN+ke6\n75mJxd+/YaPdYinTMeuy04bGt0/Fk6I+wOhtdgm5FPdApEU++IqbR3jvT32R1XQu\ndNo4gHj+Ip+6fKJfNebNdV0IylZ9zs7JeQPQSeNEVJz5bXBPF8p/SZFnhKiw92d6\n4RGsHO98AALolzlScNPX1XzLfICEAR+LfW0MWbj7sQKBgQDmd+F6LmZw0HDPiGgt\nkd3G7r6onbBMQO4K8ELvPmu2edxTgtQxKLFrVIato0CUlILfbi5oinGRI20kX1TJ\nKumuT00M79fnxDn3h3iCCO93WYHs7iwy3eVogWmVl/B+F5HqN5Q5me0YD8m8gRha\nRKOj970uhJRZvretxtXV5elSsQKBgQC64sJ2zpIfAb8iZtxnbDTB82TPymZ0Yco6\nu3fDn3d5onfai2hpZGtxouQlQ/vWBjhB9EMHg58tM9uSewP775mb/r+qCIn0KJej\nlCPfmYk/PnprUgOlNYAwckKM3rw+Ute51Tl5A/6j9nTOVUBiNvutYUp7v7lxxAWB\nNPpBFFBPrQKBgDWZp/0MkZKnR7Vcmi4PAK9lkz4P/pKdfz9YBZkywUZdLRrXEJam\nSi0WKYR0tW5Y498m9vAlUqhYvud4rHVk35hEpTzfAy3J+1lQTnyfq2HslUUPV4Q1\nC0e04WODRNFulecNKhIDdJrmARswQwOrdwuJcJxDBWWh74Ig/laS9CLhAoGAKPXi\nYV/NLvaXCdc5n4Fb3taV1eUqp393b3//M+UTrpkpY8ECVXcpBXMKRhCsdbBPTEVZ\nG6CBlsqy6VwE94cAR+yB3aaZdeYftj6VzkA8kJwFANis69zaB8RDSdTXtWE63wQY\n4Kk7enxeBYsx3VTnvIyCYrUW1BR+kF8oKnNlVtECgYEA4QcpX4dtNWPLdKw3c111\ncJpqjZ8AzIiXAdJ2OwdZ/3DPlJEIoDgbmAF9YTEw+zAT7AjfRleAbINWQZzTS73q\nGD4J2mRveeeA5uW+MrbQ4J+rzk5bp+7envwhIfoVFgSCF9ug9PKuDGg/rrpavo9P\nWv5Dt7Bbign2ax3sW/pleWQ=\n-----END PRIVATE KEY-----\n",
+  "client_email": "tiktokprofiles@tiktok-profiles.iam.gserviceaccount.com",
+  "client_id": "113534591852904123014",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/tiktokprofiles%40tiktok-profiles.iam.gserviceaccount.com"
+}
