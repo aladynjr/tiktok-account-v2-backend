@@ -9,6 +9,7 @@ const os = require('os');
 const exec = require('child_process').exec;
 const archiver = require('archiver');
 const path = require('path');
+const EventEmitter = require('node:events');
 
 const app = express();
 app.use(express.json())
@@ -31,6 +32,49 @@ const RESPONSES_SHEET_ID = '1Kp4jEz394KUrzI-PgHmd_mHxYNizCYkqmyGNGGx82Ow';
 const doc = new GoogleSpreadsheet(RESPONSES_SHEET_ID);
 // Credentials for the service account
 const CREDENTIALS = JSON.parse(fs.readFileSync('cloudkey.json'));
+
+
+
+//SOCKET IO
+const http = require('http');
+const { Server } = require("socket.io");
+const server = http.createServer(app);
+
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ['GET', 'POST']
+    }
+})
+
+
+//SOCKET CONNECTION 
+class MyEmitter extends EventEmitter { }
+const updateEmitter = new MyEmitter();
+
+io.on('connection', (socket) => {
+
+    console.log('a user connected  ' + socket.id);
+
+
+    socket.on('join_room', data => {
+        console.log('a user joined the room ' + data.roomCode)
+        //join room
+        socket.join(data.roomCode)
+
+
+        updateEmitter.on('scrapingUpdate', (message) => {
+            io.to(data.roomCode).emit("scrapingUpdate", message);
+
+        });
+
+
+        //eventEmitter.emit('scrapingUpdate', 'yo' );
+
+    })
+})
+
+
 
 
 //set exectuable path for puppeteer
@@ -120,7 +164,7 @@ function runShellCommand(command) {
 }
 
 
-const UpdateSpreadsheet = async (videosData, path, username, videoCount, followerCount, hasNewVideos) => {
+const UpdateSpreadsheet = async (res, videosData, path, username, videoCount, followerCount, hasNewVideos) => {
     if (doc.sheetsByTitle[username]) {
         console.log(clc.blue('sheet already exists, deleting it'))
         await doc.sheetsByTitle[username].delete();
@@ -129,11 +173,14 @@ const UpdateSpreadsheet = async (videosData, path, username, videoCount, followe
 
 
     let sheet = doc.sheetsByTitle[username];
-    await sheet.setHeaderRow(['account followers','account posts' ,'download all videos', 'download new videos', 'id', 'description ', 'link', 'sound link', 'views', 'likes', 'comments', 'shares', 'download link', 'upload date', 'download status',]);
+    await sheet.setHeaderRow(['account followers', 'account posts', 'download all videos', 'download new videos', 'id', 'description ', 'link', 'sound link', 'views', 'likes', 'comments', 'shares', 'download link', 'upload date', 'download status',]);
     console.log(clc.green('added row headers to new sheet '))
 
     //get list of videos in folder username 
     var files = fs.readdirSync(path);
+
+    var zipDownloadLink = `${HOST}/redirect/zip/${username}`
+    var newZipDownloadLink = `${HOST}/redirect/zip/${username}-new`
 
     var videosDataCleaneed = videosData.map((video, i) => {
         //get hashtags titles from challenges
@@ -150,8 +197,7 @@ const UpdateSpreadsheet = async (videosData, path, username, videoCount, followe
 
         var videoDownloadLink = `${HOST}/redirect/video/${username}/${video.id}`;
 
-        var zipDownloadLink = `${HOST}/redirect/zip/${username}`
-        var newZipDownloadLink = `${HOST}/redirect/zip/${username}-new`
+       
 
         return {
             id: video.id,
@@ -165,28 +211,56 @@ const UpdateSpreadsheet = async (videosData, path, username, videoCount, followe
             'download link': videoDownloadLink,
             'upload date': uploadDate,
             'download status': videoDownloaded ? 'downloaded' : 'FAILED',
-            'download all videos' : (i==0) ? zipDownloadLink : '' ,
-            'account followers' :  (i==0) ? followerCount  : '',
-            'account posts' : (i==0) ?  videoCount  : '',
-            'download new videos' : (hasNewVideos && (i==0)) ? newZipDownloadLink : ''
+            'download all videos': (i == 0) ? zipDownloadLink : '',
+            'account followers': (i == 0) ? followerCount : '',
+            'account posts': (i == 0) ? videoCount : '',
+            'download new videos': (hasNewVideos && (i == 0)) ? newZipDownloadLink : ''
         }
     }
     )
 
     await sheet.addRows(videosDataCleaneed);
+
+    for (var i = 0; i < videosDataCleaneed.length; i += 50) {
+        await sheet.addRows(videosDataCleaneed.slice(i, i + 50))
+        updateEmitter.emit('scrapingUpdate', 'Saving...')
+
+    }
+
+    var allDownloadedVideos = fs.readdirSync(`./tiktoks/${username}`);
+    var newDownloadedVideos;
+    if(hasNewVideos){
+        newDownloadedVideos = fs.readdirSync(`./tiktoks/${username}-new`)
+    }
+
+    res.send({
+        allDownloadLink: zipDownloadLink,
+        newDownloadLink: newZipDownloadLink,
+
+        profileVideosCount: videoCount,
+        profileUsername: username,
+
+        allDownloadedVideosCount: allDownloadedVideos?.length,
+        newDownloadedVideosCount: newDownloadedVideos?.length 
+    });
+
     console.log(clc.green('added rows to new sheet '))
+
+    updateEmitter.emit('scrapingUpdate', 'Added data to spreadsheet ! Profile scraped succesfully.')
+
 
 }
 
 
 const GetUserId = async (videoId, page) => {
     var link = `https://m.tiktok.com/api/item/detail/?agent_user=&itemId=${videoId}`
-
+    // https://www.tiktok.com/@saba._.tabaza/video/7172604584437763330
     //send a requset to link and log reponse to console
     await page.goto(link, { waitUntil: 'networkidle2', timeout: 0 });
     const response = await page.evaluate(() => {
         if (document.body.innerHTML) {
             var json = document.body.innerHTML.replace(/<[^>]*>?/gm, '');
+            console.log(json?.substring(0, 300))
             return json;
         } else {
             return 'no body'
@@ -195,21 +269,30 @@ const GetUserId = async (videoId, page) => {
     );
 
     var data = JSON.parse(response)
-    if(!data){
+    if (!data) {
         console.log(clc.red('WE DID NOT GET DATA'))
+        updateEmitter.emit('scrapingUpdate', 'Error : could not get user data !')
+
     }
-   /* fs.writeFile('user.json', response, function (err) {
-        if (err) throw err;
-        console.log('saved!');
-    });*/
+    /* fs.writeFile('user.json', response, function (err) {
+         if (err) throw err;
+         console.log('saved!');
+     });*/
+
+    if (data?.statusCode == '10204') {
+        console.log(clc.red('VIDEO NOT FOUND !'))
+        updateEmitter.emit('scrapingUpdate', 'Error : video not found !')
+        return
+    }
 
     var userId = data.itemInfo.itemStruct.author.id
     var username = data.itemInfo.itemStruct.author.uniqueId
+    var nickname = data.itemInfo.itemStruct.author.nickname
     var videoCount = data.itemInfo.itemStruct.authorStats.videoCount
     var followerCount = data.itemInfo.itemStruct.authorStats.followerCount
     console.log(clc.green('got user id : ' + userId + '   and username : ' + username))
 
-    return { userId, username ,videoCount, followerCount }
+    return { userId, username, videoCount, followerCount, nickname }
 }
 
 
@@ -218,6 +301,8 @@ app.get('/api/:id', async (req, res) => {
 
 
     (async () => {
+
+        console.log(clc.yellow('received video id : ' + videoId));
 
         const browser = await puppeteer.launch({
             headless: true,
@@ -235,6 +320,7 @@ app.get('/api/:id', async (req, res) => {
 
         try {
             console.log('connecting to spreadsheet...');
+            updateEmitter.emit('scrapingUpdate', 'Bot is starting...');
 
             await doc.useServiceAccountAuth({
                 client_email: CREDENTIALS.client_email,
@@ -251,12 +337,15 @@ app.get('/api/:id', async (req, res) => {
 
             await page.setUserAgent(ua);
 
-           // var videoLink = 'https://www.tiktok.com/@saba._.tabaza/video/7172605008582659330?is_copy_url=1&is_from_webapp=v1';
+            // var videoLink = 'https://www.tiktok.com/@saba._.tabaza/video/7172605008582659330?is_copy_url=1&is_from_webapp=v1';
 
-          //  var videoId = videoLink.substring(videoLink.indexOf('/video/') + 7, videoLink.indexOf('/video/') + 7 + 19);
+            //  var videoId = videoLink.substring(videoLink.indexOf('/video/') + 7, videoLink.indexOf('/video/') + 7 + 19);
 
 
-            const { userId, username ,videoCount, followerCount } = await GetUserId(videoId, page)
+            const { userId, username, videoCount, followerCount, nickname } = await GetUserId(videoId, page)
+
+            updateEmitter.emit('scrapingUpdate', 'Bot got profile info !  ' + nickname + ' has ' + followerCount + ' followers');
+
 
             var totalNumberOfVideos = 0;
             var videosData = [];
@@ -282,6 +371,8 @@ app.get('/api/:id', async (req, res) => {
                 videosData = videosData.concat(data.items)
 
                 console.log(clc.green('we got ' + data.items.length + ' videos'))
+                updateEmitter.emit('scrapingUpdate', 'Bot got ' + data.items.length + ' videos data !' + (totalNumberOfVideos ? (' total is ' + totalNumberOfVideos) : ''));
+
                 totalNumberOfVideos += data.items.length
 
                 if (data.hasMore) {
@@ -299,6 +390,7 @@ app.get('/api/:id', async (req, res) => {
                     console.log('-----------------------')
 
                     console.log(clc.yellow('total number of videos is ' + totalNumberOfVideos))
+                    updateEmitter.emit('scrapingUpdate','Bot finished getting videos ! Total number is ' + totalNumberOfVideos + ' video');
 
 
                     //check if there's a folder in tiktoks folder with username as name
@@ -329,8 +421,8 @@ app.get('/api/:id', async (req, res) => {
 
                         if (!links) {
                             console.log(clc.yellow('NO NEW VIDEOS TO DOWNLOAD'))
-
-                            UpdateSpreadsheet(videosData, path, username, videoCount, followerCount)
+                            updateEmitter.emit('scrapingUpdate', 'There are no new videos to download from this profile !')
+                            UpdateSpreadsheet(res, videosData, path, username, videoCount, followerCount)
 
                         }
                         else {
@@ -339,6 +431,7 @@ app.get('/api/:id', async (req, res) => {
 
                             var videosToDownload = links.split(' ')?.length - 1
                             console.log(clc.blue('videos to download : ' + videosToDownload + ' videos. starting download... '))
+                            updateEmitter.emit('scrapingUpdate', 'There are ' + videosToDownload + ' new videos to download !  starting...')
 
                             var downloadedVideosCount = 0;
                             var isDownloading = true;
@@ -354,6 +447,9 @@ app.get('/api/:id', async (req, res) => {
                                     if (downloadedVideosCount > previousDownloadedVideosCount) {
 
                                         console.log(clc.green('we have downloaded ' + downloadedVideosCount + '/' + videosToDownload + ' videos'))
+
+                                        updateEmitter.emit('scrapingUpdate', 'We have downloaded ' + downloadedVideosCount + '/' + videosToDownload + ' videos')
+
                                     }
 
                                 } else {
@@ -365,6 +461,8 @@ app.get('/api/:id', async (req, res) => {
                             runShellCommand(`yt-dlp -v  --output /tiktoks/${username}/%(id)s.%(ext)s ${links}`)
                                 .then(async (result) => {
                                     console.log(clc.green('downloaded videos to folder ' + path))
+                                    updateEmitter.emit('scrapingUpdate', 'Bot finished download! zipping folders...')
+
                                     isDownloading = false;
 
                                     var allVideos = fs.readdirSync(path);
@@ -372,6 +470,10 @@ app.get('/api/:id', async (req, res) => {
 
                                     //create another folder in tiktoks folder username+random,
                                     var newFolderName = `${username}-new`
+                                    if(fs.existsSync(`./tiktoks/${newFolderName}`)){
+                                        fs.rmSync(`./tiktoks/${newFolderName}`, { recursive: true, force: true });
+
+                                    }
                                     fs.mkdirSync(`./tiktoks/${newFolderName}`);
 
                                     //and copy newVideos to it
@@ -395,12 +497,14 @@ app.get('/api/:id', async (req, res) => {
                                     ZipFolder(username, username)
                                         .then(() => {
                                             console.log(clc.green('profile folder zipped'))
+                                            updateEmitter.emit('scrapingUpdate', 'All videos folder is zipped ! zipping new videos folder...')
 
                                             ZipFolder(newFolderName, newFolderName)
                                                 .then(() => {
                                                     console.log(clc.green('new videos folder zipped'))
+                                                    updateEmitter.emit('scrapingUpdate', 'New videos folder is zipped ! updating spreadsheet...')
 
-                                                    UpdateSpreadsheet(videosData, path, username, videoCount, followerCount, true)
+                                                    UpdateSpreadsheet(res, videosData, path, username, videoCount, followerCount, true)
 
                                                 })
                                         })
@@ -423,6 +527,7 @@ app.get('/api/:id', async (req, res) => {
 
                         var videosToDownload = links.split(' ')?.length - 1
                         console.log(clc.blue('videos to download : ' + videosToDownload + ' videos. starting download... '))
+                        updateEmitter.emit('scrapingUpdate', 'There are ' + videosToDownload + ' new videos to download...')
 
                         //create new folder
                         fs.mkdirSync(path);
@@ -440,6 +545,8 @@ app.get('/api/:id', async (req, res) => {
                                 downloadedVideosCount = files.length;
                                 if (downloadedVideosCount > previousDownloadedVideosCount) {
                                     console.log(clc.green('we have downloaded ' + downloadedVideosCount + '/' + videosToDownload + ' videos'))
+                                    updateEmitter.emit('scrapingUpdate', 'We have downloaded ' + downloadedVideosCount + '/' + videosToDownload + ' videos')
+
                                 }
 
                             } else {
@@ -450,15 +557,14 @@ app.get('/api/:id', async (req, res) => {
                             .then(async (result) => {
                                 console.log(clc.green('downloaded videos to folder ' + path))
                                 isDownloading = false;
-
-
-
+                                updateEmitter.emit('scrapingUpdate', 'Bot finished download! zipping folder...')
 
                                 ZipFolder(username, username)
                                     .then(() => {
                                         console.log(clc.green('new profile folder zipped'))
+                                        updateEmitter.emit('scrapingUpdate', 'Videos folder is zipped ! updating spreadsheet...')
 
-                                        UpdateSpreadsheet(videosData, path, username, videoCount, followerCount)
+                                        UpdateSpreadsheet(res, videosData, path, username, videoCount, followerCount, false)
 
                                     })
 
@@ -470,7 +576,8 @@ app.get('/api/:id', async (req, res) => {
 
                         // zip whole folder
                     }
-                }}
+                }
+            }
 
             await GetVideosList();
 
@@ -478,10 +585,13 @@ app.get('/api/:id', async (req, res) => {
 
         } catch (e) {
             console.log(e)
+            updateEmitter.emit('scrapingUpdate', 'Error : ' + e)
         }
         finally {
             console.log('closing browser using finally')
             //  await browser.close();
+            //updateEmitter.emit('scrapingUpdate', 'Bot !')
+
         }
     })()
 })
@@ -524,7 +634,7 @@ app.get('/', (req, res) => {
     res.json('this is working fine')
 })
 
-app.listen(8080, () => {
+server.listen(8080, () => {
     console.log('Server running on port 8080')
     console.log('time is ' + new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" }))
 })
